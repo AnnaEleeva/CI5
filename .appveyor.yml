@@ -1,0 +1,105 @@
+#...............................................................................
+#
+#  This file is part of the Jancy toolkit.
+#
+#  Jancy is distributed under the MIT license.
+#  For details see accompanying license.txt file,
+#  the public copy of which is also available at:
+#  http://tibbo.com/downloads/archive/jancy/license.txt
+#
+#...............................................................................
+
+image:
+    - Visual Studio 2015
+    - Visual Studio 2017
+
+init:
+    - git config --global core.autocrlf input
+
+clone_folder:  c:\projects\jancy
+shallow_clone: true
+
+platform:
+    - x64
+    - x86
+
+configuration:
+    - Debug
+    - Release
+
+environment:
+    matrix:
+        -   LLVM_VERSION: 3.4.2
+            TOOLCHAIN:    msvc10
+
+        -   LLVM_VERSION: 3.4.2
+            TOOLCHAIN:    msvc15
+
+        -   LLVM_VERSION: 3.9.1
+            TOOLCHAIN:    msvc12
+
+        -   LLVM_VERSION: 7.1.0
+            TOOLCHAIN:    msvc15
+
+        -   LLVM_VERSION: 8.0.0
+            TOOLCHAIN:    msvc15
+
+matrix:
+    fast_finish: false
+
+    exclude:
+        -   image: Visual Studio 2015
+            TOOLCHAIN: msvc15
+
+        -   image: Visual Studio 2017
+            TOOLCHAIN: msvc10
+
+        -   image: Visual Studio 2017
+            TOOLCHAIN: msvc12
+
+        -   image: Visual Studio 2017
+            TOOLCHAIN: msvc14
+
+install:
+    - call ci\appveyor\set-env.bat %TOOLCHAIN% %PLATFORM%
+    - call ci\appveyor\install.bat
+
+    - git clone --depth 1 https://github.com/vovkos/axl
+    - git clone --depth 1 https://github.com/vovkos/graco
+
+build_script:
+    - set THIS_DIR=%CD%
+    - set THIS_DIR_CMAKE=%THIS_DIR:\=/%
+
+    - mkdir axl\build
+    - cd axl\build
+    - cmake .. %CMAKE_CONFIGURE_FLAGS%
+    - cmake --build . %CMAKE_BUILD_FLAGS%
+
+    - cd %THIS_DIR%
+    - echo set (AXL_CMAKE_DIR %THIS_DIR_CMAKE%/axl/cmake %THIS_DIR_CMAKE%/axl/build/cmake) >> paths.cmake
+
+    - mkdir graco\build
+    - cd graco\build
+    - cmake .. %CMAKE_CONFIGURE_FLAGS%
+    - cmake --build . %CMAKE_BUILD_FLAGS%
+
+    - cd %THIS_DIR%
+    - echo set (GRACO_CMAKE_DIR %THIS_DIR_CMAKE%/graco/cmake %THIS_DIR_CMAKE%/graco/build/cmake) >> paths.cmake
+
+    - mkdir build
+    - cd build
+    - cmake .. %CMAKE_CONFIGURE_FLAGS%
+    - cmake --build . %CMAKE_BUILD_FLAGS%
+
+    - ps: Add-AppveyorMessage "APPVEYOR_REPO_COMMIT=$env:APPVEYOR_REPO_COMMIT"
+
+test_script:
+    - ctest -C %CONFIGURATION% --output-on-failure
+
+notifications:
+     -   provider: Webhook
+         on_build_success: true
+         on_build_failure: false
+
+         url: http://jancy.org:5005/appveyor-ci
